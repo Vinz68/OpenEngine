@@ -1,0 +1,55 @@
+/*
+ *  ---------------------------------------------------------------------------------------------
+ *  Script Name:vvk_act_script
+ *  Description:  Generic ACK Script
+ *  Type:  Generic
+ *  ---------------------------------------------------------------------------------------------
+ *  Author:  CRSADMIN11
+ *  Domain:  UKTRMC05
+ *  Creation Date:  29/11/2016 09:40:00
+ *  ---------------------------------------------------------------------------------------------
+ *  Purpose 
+ *  1. Locate MSH segment in org_msg
+ *  2. Append MSA segment (with App Ack) to it
+ *  3. Place resulting string in out_msg
+ *  ---------------------------------------------------------------------------------------------
+ */ 
+
+record tmp
+(
+   1 str = vc
+)
+
+; End Of Segment Delimiter
+set EOSD = char(13)
+
+; Parse out the MSH
+set mp = FINDSTRING( "MSH", oen_request->org_msg)
+
+; Not Found
+if  (mp = 0 )
+	set oen_reply->ack_status = 0
+	execute oencpm_msglog ("MSH segment not found")
+	go to single_exit
+endif
+
+; Now look for the End Of Segment Delimiter (EOSD)
+set sdp = findstring (EOSD, oen_request->org_msg, mp)
+
+; Not Found
+if (sdp = 0)
+	set oen_reply->ack_status = 0
+	execute oencpm_msglog ("MSH end of segment delimiter not found")
+	go to single_exit
+endif   
+
+; Got it. Get entire segment and store in temp variable
+set tmp->str = substring(mp, sdp-mp+1, oen_request->org_msg)
+
+; Now, append MSA segment to it, and store in reply
+set oen_reply->out_msg = build(tmp->str, "MSA||AA",EOSD)
+
+; Set status = successful
+set oen_reply->ack_status = 1
+
+#single_exit

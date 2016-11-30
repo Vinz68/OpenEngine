@@ -1,0 +1,41 @@
+/*
+ *  ---------------------------------------------------------------------------------------------
+ *  Script Name:  vvk_type_script
+ *  Description:  Vincents type script
+ *  Type:  Open Engine Type Script
+ *  ---------------------------------------------------------------------------------------------
+ *  Author:  CRSADMIN11
+ *  Domain:  UKTRMC05
+ *  Creation Date:  30/11/2016 09:40:00
+ *  ---------------------------------------------------------------------------------------------
+ */
+ 
+declare msgOrg =vc			; the original message
+declare position =i4
+declare msgType =c3
+
+EXECUTE oencpm_msglog("vvk_type_script STARTED. ") 
+
+; Get the original message 
+Set msgOrg = BUILD( TRIM(Oen_request->org_msg), char(13))
+Set msgSize = SIZE(msgOrg,1)
+
+EXECUTE oencpm_msglog(BUILD("Incomming: ", msgOrg, char(0) ))
+EXECUTE oencpm_msglog(BUILD("Message size = ", msgSize, char(0) ))
+
+; Goto the 8th section of the message (assuming it starts with MSH)
+set position = 0
+for (index = 1 to 8)
+   set position = FINDSTRING("|", msgOrg, position) +1
+   EXECUTE oencpm_msglog(BUILD("| found on position: ", position, char(0)))
+endfor
+
+; Hold Message Type & Trigger
+Set msgType = SUBSTRING(position,position+3, msgOrg)
+EXECUTE oencpm_msglog(BUILD("Found Type: ", msgType, " on Postion: ", position, char(0)))  
+
+; Output the message type and message trigger
+Set oen_reply->type = BUILD(msgType, char(0))
+Set oen_reply->trigger = BUILD(msgType, char(0))
+
+

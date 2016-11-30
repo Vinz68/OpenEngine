@@ -1,0 +1,71 @@
+/*
+ *  ---------------------------------------------------------------------------------------------
+ *  Script Name:  vvk_mod_org
+ *  Description:  Vincents modify original
+ *  Type:  Open Engine Modify Original Script
+ *  ---------------------------------------------------------------------------------------------
+ *  Author:  CRSADMIN11
+ *  Domain:  UKTRMC05
+ *  Creation Date:  29/11/2016 15:56:03
+ *  ---------------------------------------------------------------------------------------------
+ */
+
+ ; input some HL7 segment with propieraty <013>X .....<013> segments.
+ ; MSH| .....<013>PID|------<013>XCN|.....<013>PV1|.....<013>XVC|---|||<013>PV2|||||||<013>
+ 
+ ; Goal: Remove all <013>X ...<013>  segments from the message
+ 
+RECORD temp
+(
+    1 msgOrg =vc			; the original message
+	1 msgNew =vc            ; the new message without the "<13>X ... " segments
+)
+
+EXECUTE oencpm_msglog("vvk_mod_org STARTED. ")
+
+; Get the original message 
+Set temp->msgOrg = BUILD( TRIM(Oen_request->org_msg), char(13))
+Set msgSize = SIZE(temp->msgOrg,1)
+
+EXECUTE oencpm_msglog(BUILD("Incomming: ",temp->msgOrg))
+EXECUTE oencpm_msglog(BUILD("Message size = ", msgSize))
+
+Set startPos=1                                  ; start at the beginning
+Set endPos=1
+Set searchExpression = BUILD(char(13),"X")     ; the segment <13>X  search criteria
+Set foundPos=startPos
+
+;------------------------------------
+; FIND <013>X segments 
+while (foundPos>0)
+
+   EXECUTE oencpm_msglog(BUILD("In WHILE, searching from startPos: ",startPos ))
+
+   set foundPos = FINDSTRING(searchExpression,temp->msgOrg,startPos,0)
+
+   ; Note: A zero will be returned if there were no matches.
+   if (foundPos>0)
+      EXECUTE oencpm_msglog(BUILD("Found a X-segment on position: ", foundPos))
+	  
+	  EXECUTE oencpm_msglog( BUILD("Add message part from: ", startPos, " to: ", foundPos ))
+	  
+	  ; add up to the beginning of found segment to new msg
+      set temp->msgNew = BUILD(temp->msgNew,SUBSTRING(startPos,foundPos, temp->msgOrg))     
+	  
+	  ; Find the end position (of the <013>X segment)
+	  set startPos = FINDSTRING( char(13),temp->msgOrg, foundPos+1, 0)
+	  
+   else
+      EXECUTE oencpm_msglog( BUILD("No next X-Segment found. "
+	     , "  Add LAST message part from: ", startPos, " to: ", msgSize )) 
+		 
+	  set temp->msgNew = BUILD(temp->msgNew,SUBSTRING(startPos,msgSize, temp->msgOrg))
+   endif
+   
+endwhile
+
+EXECUTE oencpm_msglog(BUILD("OUTPUT: ",temp->msgNew, char(0) ))
+ 
+; output the message without the X segments.
+Set Oen_Reply->out_msg = BUILD(temp->msgNew, char(0))
+

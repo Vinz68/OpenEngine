@@ -1,0 +1,42 @@
+/*
+ *  ---------------------------------------------------------------------------------------------
+ *  Script Name:  vvk_route_script
+ *  Description:  Vincents Route Script
+ *  Type:  Open Engine Route Script
+ *  ---------------------------------------------------------------------------------------------
+ *  Author:  CRSADMIN11
+ *  Domain:  UKTRMC05
+ *  Creation Date:  30/11/2016 14:38:13
+ *  ---------------------------------------------------------------------------------------------
+ */
+ 
+; Our DISK OUT CommServers
+declare VVK_DISK_OUT  =i4 with nonconstant(1029)
+declare VVK_DISK_OUT2 =i4 with nonconstant (9999)
+
+; Optimistic view on life; we have success.
+declare ReturnCode =i4 with nonconstant (1)
+
+case (Oenobj->CONTROL_GROUP [1]->MSH [1]->message_type->messg_type) 
+
+of "ADT":
+   set stat = alterlist(OenRoute->route_list, 1)
+   set OenRoute->route_list[1]->r_pid=VVK_DISK_OUT 
+   
+of "ORM":
+   set stat = alterlist(OenRoute->route_list, 1)
+   set OenRoute->route_list[1]->r_pid=VVK_DISK_OUT2  
+
+of "ORU":
+   set stat = alterlist(OenRoute->route_list, 2)
+   set OenRoute->route_list[1]->r_pid=VVK_DISK_OUT 
+   set OenRoute->route_list[1]->r_pid=VVK_DISK_OUT2    
+else 
+   set ReturnCode = 0
+
+endcase
+
+set Oenstatus->status = ReturnCode
+
+
+

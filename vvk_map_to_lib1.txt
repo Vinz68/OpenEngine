@@ -1,0 +1,118 @@
+/*
+ *  ---------------------------------------------------------------------------------------------
+ *  Script Name:  vvk_map_to_lib1
+ *  Description:  Vincents Map To Library
+ *  Type:  Open Engine Map to Library Script
+ *  ---------------------------------------------------------------------------------------------
+ *  Author:  CRSADMIN11
+ *  Domain:  UKTRMC05
+ *  Creation Date:  30/11/2016 15:48:46
+ *  ---------------------------------------------------------------------------------------------
+ *  Purpose - (Activity 10)
+ *  1. Process a proprietary interface, using a fixed-length input file
+ *  ---------------------------------------------------------------------------------------------
+ */ 
+; example:   ADTA01012345678900640458BOZO,DAN                                06-06-1966MSVSOUTH     6866-3457
+
+declare dateFormat(dateValueStr=vc)=vc
+
+record propMsg
+(
+   1 messageType =c3          ; MSH 9.1 Type
+   1 messageTrigger =c3       ; MSH 9.2 Event
+   1 mrn =c10                 ; PID 3.1 Patient ID
+   1 fin =c8                  ; PID 18.1 Patient Account 
+   1 patientName =c40		  ; Lastname,Firstname
+   1 patientLast =c40         ; PID 5.1 LastName 
+   1 patientFirst =c40        ; PID 5.2 FirstName
+   1 DOB =c10                 ; PID 7 Date of Birth
+   1 gender =c1               ; PID 8 Sex
+   1 hospitalService =c2      ; PV1 10 Hospital Service
+   1 nursingStation =c10      ; PV1 3.1 Point of Service Location
+   1 policyNumber =c9         ; IN1 36 Policy Number
+)
+ 
+EXECUTE oencpm_msglog("vvk_map_to_lib1 STARTED. ") 
+
+; Get the original message and its size
+Set msgOrg = BUILD( TRIM(Oen_request->org_msg), char(13))
+Set msgSize = SIZE(TRIM(Oen_request->org_msg),1)
+
+EXECUTE oencpm_msglog(BUILD("Incomming: ", msgOrg, char(0) ))
+EXECUTE oencpm_msglog(BUILD("Message size = ", msgSize, char(0) ))
+EXECUTE oencpm_msglog(BUILD("Record size = ", SIZE(propMsg, 1)))
+
+
+; Check the FIXED length of the proprietary file
+if (not msgSize=96)
+   EXECUTE oencpm_msglog("WRONG FIXED LENGTH. ") 
+else
+    ; Map fields on the Record Structure
+	Set propMsg->messageType     = substring( 1,  3, oen_request->org_msg)
+	Set propMsg->messageTrigger  = substring( 4,  3, oen_request->org_msg)
+	Set propMsg->mrn             = substring( 7, 10, oen_request->org_msg)
+	Set propMsg->fin             = substring(17,  8, oen_request->org_msg)
+	Set propMsg->patientName     = substring(25, 40, oen_request->org_msg)
+	Set propMsg->DOB             = substring(65, 10, oen_request->org_msg)
+	Set propMsg->gender          = substring(75,  1, oen_request->org_msg)
+	Set propMsg->hospitalService = substring(76,  2, oen_request->org_msg)
+	Set propMsg->nursingStation  = substring(78, 10, oen_request->org_msg)
+	Set propMsg->policyNumber    = substring(88,  9, oen_request->org_msg)
+	
+	; Split Lastname, Firstname
+	Set propMsg->patientLast  = PIECE(propMsg->patientName,",",1,"ERROR")
+	Set propMsg->patientFirst = PIECE(propMsg->patientName,",",2, "ERROR")
+	
+	; Copy fields into the Object
+	Set oen_reply->CONTROL_GROUP [1]->MSH [1]->message_type->messg_type = propMsg->messageType
+    Set oen_reply->CONTROL_GROUP [1]->MSH [1]->message_type->messg_trigger = propMsg->messageTrigger
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int [1]->pat_id = propMsg->mrn
+    Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_account_nbr->pat_id = propMsg->fin 
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_name [1]->last_name = propMsg->patientLast
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_name [1]->first_name = propMsg->patientFirst
+
+	; Format patient date of birth (PID.7) to YYYYMMDD
+    EXECUTE oencpm_msglog(BUILD("DOB input: ", propMsg->DOB, char(0) ))
+    set patientDOB=dateFormat(propMsg->DOB);
+    EXECUTE oencpm_msglog(BUILD("DOB output: ", patientDOB, char(0) ))
+
+    Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->date_of_birth = patientDOB	
+    Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->sex = propMsg->gender
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->hospital_service = propMsg->hospitalService
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->assigned_pat_loc->nurse_unit = propMsg->nursingStation
+	Set oen_reply->PERSON_GROUP [1]->FIN_GROUP [1]->INS_GROUP [1]->IN1->policy_nbr = propMsg->policyNumber
+
+endif
+
+
+  
+   
+
+ 
+/*************************************************************************************************
+  DEFINED SUBROUTINES 
+**************************************************************************************************/
+subroutine dateFormat(dateValueStr)
+; needs input string in format "mm-dd-yyyy"
+; formats to output "yyyymmdd"
+
+   declare dateString=vc
+ 
+   if(dateValueStr!="")
+      set dateString = build(
+      	substring(7,4,dateValueStr),	; YYYY
+      	substring(1,2,dateValueStr),	; MM
+      	substring(4,2,dateValueStr))	; DD
+    endif
+   return (dateString)
+end
+
+
+
+
+
+
+
+
+
+

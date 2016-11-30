@@ -1,0 +1,163 @@
+ /*
+ *  ---------------------------------------------------------------------------------------------
+ *  Script Name:  vvk_mod_obj
+ *  Description:  Vincent's Modify Object Script
+ *  Type:  Open Engine Modify Object Script
+ *  ---------------------------------------------------------------------------------------------
+ *  Author:  CRSADMIN11 / VVK
+ *  Domain:  UKTRMC05
+ *  Creation Date:  29/11/2016 13:21:07
+ *  ---------------------------------------------------------------------------------------------
+ *  Modifications:
+ *  v0.1	Vincent van Beek	2016-11-29    	Initial release - process ADT message
+ *  v0.2	Vincent van Beek	2016-11-30    	Initial release - process ORM message
+ *  ---------------------------------------------------------------------------------------------
+ *
+ *  Purpose when ADT message
+ *  1. Swap the internal and external IDs (=> Pid 2 and pid 3 change)
+ *  2. Strip '-' from SSN  (=> replace "-"with  "")
+ *  3. Modify Attending, Admitting, Referring and Consulting Doctor
+ *
+ *  Purpose when ORM message
+ *  1. Swap Placer Order Id to the Filler Order ID (Swap ORM 2 and ORM 3)
+ *  ---------------------------------------------------------------------------------------------
+ */
+ 
+EXECUTE oencpm_msglog(BUILD("vvk_mod_obj STARTED. ", char(0))) 
+
+ if (oen_reply->CONTROL_GROUP [1]->MSH [1]->message_type->messg_type = "ADT")  
+    EXECUTE oencpm_msglog(BUILD("ADT Processing... ", char(0))) 
+  
+	; ----------------------------------------------------------------------------------------------- 
+	;  1. Swap the internal and external IDs => Pid 2 and Pid 3 change
+	; ----------------------------------------------------------------------------------------------- 
+	EXECUTE oencpm_msglog(BUILD("ADT Swap the internal and external IDs... ", char(0)))
+	
+	;   patient_id_ext.* => temp variable ext_xxxx
+	Set ext_pat_id             = oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->pat_id 
+	Set ext_check_digit        = oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->check_digit 
+	Set ext_check_digit_scheme = oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->check_digit_scheme 
+	Set ext_assign_fac_id      = oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->assign_fac_id 
+	Set ext_id_type            = oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->id_type 
+	Set ext_act_assign_fac_id  = oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->act_assign_fac_id 
+	
+	;   patient_id_ext.* = patient_id_int.*
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->pat_id = 
+	    oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->pat_id
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->check_digit = 
+	    oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->check_digit
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->check_digit_scheme = 
+	    oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->check_digit_scheme
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->assign_fac_id = 
+	    oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->assign_fac_id
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->id_type = 
+	    oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->id_type
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_ext->act_assign_fac_id = 
+	    oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->act_assign_fac_id
+
+	;   patient_id_int = temp variable ext_* 
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->pat_id = ext_pat_id
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->check_digit = ext_check_digit
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->check_digit_scheme = ext_check_digit_scheme
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->assign_fac_id = ext_assign_fac_id
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->id_type = ext_id_type
+ 	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int->act_assign_fac_id = ext_act_assign_fac_id   
+
+	; ----------------------------------------------------------------------------------------------- 
+	;  2. Strip '-' from SSN  => REPLACE '-' with  ''  
+	; -----------------------------------------------------------------------------------------------
+	EXECUTE oencpm_msglog(BUILD("ADT Strip '-' from SSN  ", char(0))) 
+	 
+	Set ssn_raw = oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->ssn_nbr 
+	EXECUTE oencpm_msglog(BUILD("SSN input=",ssn_raw, char(0) ))
+	
+	Set ssn_new = REPLACE(ssn_raw,"-","",0)
+	EXECUTE oencpm_msglog(BUILD("SSN output=",ssn_new, char(0) ))
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->ssn_nbr = ssn_new
+
+	; ----------------------------------------------------------------------------------------------- 
+	;  3. Modify Attending, Admitting, Referring and Consulting  Doctor
+	; ----------------------------------------------------------------------------------------------- 
+	EXECUTE oencpm_msglog(BUILD("ADT Modify Attending, Admitting, Referring and Consulting  Doctor  ", char(0))) 
+	; -------------------------------------------
+	; Attending Physician PV1-07 (not repeating)
+	if  (not oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->attending_doc->id_type = "COMMUNITY DR NBR")
+	   Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->attending_doc->id_nbr = ""
+	   Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->attending_doc->last_name = "" 
+	   Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->attending_doc->first_name = ""
+	   Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->attending_doc->id_type = ""
+	endif
+
+	; -------------------------------------------
+	; Additting Physician PV1-17 (not repeating)
+	if (not oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->admitting_doc->id_type = "COMMUNITY DR NBR")
+	   Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->admitting_doc->id_nbr = ""
+	   Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->admitting_doc->last_name = "" 
+	   Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->admitting_doc->first_name = ""
+	   Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->admitting_doc->id_type = ""
+	endif
+
+	
+	; -------------------------------------------
+	; Referring Physician PV1-08 (could be repeating; more then one segment)
+	Set repeats = SIZE(oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc,5)
+	Set foundIndex = 0 ; default not found.
+	if (repeats>1)
+	  for (x = 1 to repeats)
+		 EXECUTE oencpm_msglog(BUILD("Referring doctor=> seach for COMMUNITY DR on idex=",x, char(0)))
+		 if (oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [x]->id_type = "COMMUNITY DR NBR")
+			set foundIndex = x
+			EXECUTE oencpm_msglog(BUILD("Referring doctor found as COMMUNITY DR on idex=",foundIndex, char(0)))
+		 endif
+	  endfor
+	endif
+
+	; We found a Refferring Community Physician (on index>1). Move this referring doctor to index 1 ; and change array size to 1
+	if (foundIndex>1)
+	  set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [1] = 
+		 oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [foundIndex]
+	  set stat = alterlist(oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc, 1)
+	endif
+
+	; -------------------------------------------
+	; Consulting Physician PV1-09 (could be repeating; more then one segment)
+	Set repeats = SIZE(oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc,5)
+	Set foundIndex = 0 ; default not found.
+	if (repeats>1)
+	  for (x = 1 to repeats)
+		 EXECUTE oencpm_msglog(BUILD("Consulting doctor=> seach for COMMUNITY DR on idex=",x, char(0)))
+		 if (oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [x]->id_type = "COMMUNITY DR NBR")
+			set foundIndex = x
+			EXECUTE oencpm_msglog(BUILD("Consulting doctor found as COMMUNITY DR on idex=",foundIndex, char(0)))
+		 endif
+	  endfor
+	endif
+
+	; We found a Consulting Community Physician (on index>1). Move this referring doctor to index 1 ; and change array size to 1
+	if (foundIndex>1)
+	  set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [1] = 
+		 oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [foundIndex]
+	  set stat = alterlist(oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc, 1)
+	endif
+	
+	EXECUTE oencpm_msglog(BUILD("ADT Processed", char(0))) 	
+
+
+elseif (oen_reply->CONTROL_GROUP [1]->MSH [1]->message_type->messg_type = "ORM") 
+
+	Set placerOrderId = oen_reply->ORDER_GROUP [1]->ORC [1]->placer_ord_nbr->id
+	Set oen_reply->ORDER_GROUP [1]->ORC [1]->placer_ord_nbr->id = 
+	   oen_reply->ORDER_GROUP [1]->ORC [1]->filler_ord_nbr->id
+	Set oen_reply->ORDER_GROUP [1]->ORC [1]->filler_ord_nbr->id = placerOrderId
+	
+    EXECUTE oencpm_msglog(BUILD("ORM Processed", char(0))) 	
+	
+else
+    EXECUTE oencpm_msglog(BUILD("ERROR: Unknown Message Type. Not Processed!", char(0)))
+endif
+
+
+EXECUTE oencpm_msglog(BUILD("vvk_mod_obj ENDED succesfully. ", char(0))) 
+
+
+
