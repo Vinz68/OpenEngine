@@ -84,6 +84,7 @@ else
 
 endif
 
+EXECUTE oencpm_msglog("vvk_map_to_lib1 FINISHED. ") 
 
   
    

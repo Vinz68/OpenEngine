@@ -1,0 +1,171 @@
+/*
+ *  ---------------------------------------------------------------------------------------------
+ *  Script Name:  vvk_map_to_lib2
+ *  Description:  Vincents Map To Library (delimeted file)
+ *  Type:  Open Engine Map to Library Script
+ *  ---------------------------------------------------------------------------------------------
+ *  Author:  CRSADMIN11
+ *  Domain:  UKTRMC05
+ *  Creation Date:  01/12/2016 09:13:16
+ *  ---------------------------------------------------------------------------------------------
+ *  Purpose - (Activity 11)
+ *  1. Process a proprietary interface, using a delimited input file
+ *  ---------------------------------------------------------------------------------------------
+ */ 
+
+; Functions
+declare dateFormat(dateValueStr=vc)=vc
+
+; Fields
+declare fieldStr =vc		; contains one field from the input file
+declare fieldCount =i4      ; field number in the delimeted input file
+declare startPos =i4
+declare endPos =i4
+
+; example:   ADT|A01|01234567|8900640458|BOZO,DAN|HospServ|NursStation|06-06-1966|M|BCBS|6866-3457|
+record propMsg
+(
+   1 messageType =vc          ; MSH 9.1 Type
+   1 messageTrigger =vc       ; MSH 9.2 Event
+   1 mrn =vc                  ; PID 3.1 Patient ID
+   1 fin =vc                  ; PID 18.1 Patient Account 
+   1 patientName =vc		  ; Lastname,Firstname
+   1 patientLast =vc          ; PID 5.1 LastName 
+   1 patientFirst =vc         ; PID 5.2 FirstName
+   1 hospitalService =vc      ; PV1 10 Hospital Service
+   1 nursingStation =vc       ; PV1 3.1 Point of Service Location   
+   1 DOB =vc                  ; PID 7 Date of Birth
+   1 gender =vc               ; PID 8 Sex
+   1 insurance =vc            ; IN1 xxx TBD
+   1 policyNumber =vc         ; IN1 36 Policy Number
+)
+ 
+EXECUTE oencpm_msglog("vvk_map_to_lib2 STARTED. ") 
+
+; Get the original message and its size
+Set msgOrg = BUILD( TRIM(Oen_request->org_msg), char(13))
+Set msgSize = SIZE(TRIM(Oen_request->org_msg),1)
+
+EXECUTE oencpm_msglog(BUILD("Incomming: ", msgOrg, char(0) ))
+EXECUTE oencpm_msglog(BUILD("Message size = ", msgSize, char(0) ))
+
+; Initializing. Start at the beginning of incomming delemited file
+Set startPos=1                        
+Set endPos=1
+Set searchExpression = BUILD("|")     ; the search criteria = the delimiter symbol.
+Set foundPos=startPos
+Set fieldCount=1                      
+
+;------------------------------------
+; Parse/Process the delimited input file; field by field
+EXECUTE oencpm_msglog(BUILD("Start WHILE, searching from startPos: ",startPos, char(0) ))
+while (foundPos>0)
+
+   ; FIND the delimiter
+   set foundPos = FINDSTRING(searchExpression, msgOrg, startPos,0)
+
+   EXECUTE oencpm_msglog(BUILD("found delimiter on position= ",foundPos, char(0) ))
+   
+   ; Note: A zero will be returned if there were no matches.
+   if (foundPos>0)
+
+	  ; get the field
+	  set length = foundPos - startPos 
+      ;set fieldStr = BUILD( SUBSTRING(startPos, length, msgOrg), char(0) )
+	  set fieldStr = SUBSTRING(startPos, length, msgOrg)
+	  
+      EXECUTE oencpm_msglog(BUILD("Field:", fieldCount, "[", fieldStr, "] length=", length, char(0)))	  
+	 
+      case (fieldCount) 
+
+      of 1:   ; messageType
+	     Set propMsg->messageType = fieldStr	  
+	  of 2:   ; messageTrigger
+	     Set propMsg->messageTrigger = fieldStr
+	  of 3:   ; mrn
+	     Set propMsg->mrn = fieldStr
+	  of 4:   ; fin
+	     Set propMsg->fin = fieldStr
+	  of 5:   ; patientName
+	     Set propMsg->patientName = fieldStr
+		 ; Split Lastname, Firstname
+	     Set propMsg->patientLast  = PIECE(propMsg->patientName,",",1,"ERROR")
+	     Set propMsg->patientFirst = PIECE(propMsg->patientName,",",2, "ERROR")
+	  of 6:   ; hospitalService
+	     Set propMsg->hospitalService = fieldStr
+	  of 7:   ; nursingStation
+	     Set propMsg->nursingStation = fieldStr
+	  of 8:   ; DOB
+	     Set propMsg->DOB = fieldStr
+	  of 9:   ; gender
+	     Set propMsg->gender = fieldStr
+	  of 10:   ; insurance
+	     Set propMsg->insurance = fieldStr	 
+	  of 11:   ; policyNumber
+	     Set propMsg->policyNumber = fieldStr
+
+      else 
+         EXECUTE oencpm_msglog(BUILD("Unknown Field '", fieldCount, "' found. Delimiter on char position: ", foundPos, char(0)))
+      endcase
+	  
+	  ; start seaching on next field.
+	  Set startPos = foundPos + 1
+	  Set fieldCount = fieldCount + 1
+	  
+   endif
+	  
+endwhile		 
+		 
+; We need a full message (all fields) otherwise we will not process it.
+if (fieldCount>10)	
+
+    EXECUTE oencpm_msglog("Copy fields into the Object.") 
+
+	; Copy fields into the Object
+	Set oen_reply->CONTROL_GROUP [1]->MSH [1]->message_type->messg_type = propMsg->messageType
+    Set oen_reply->CONTROL_GROUP [1]->MSH [1]->message_type->messg_trigger = propMsg->messageTrigger
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int [1]->pat_id = propMsg->mrn
+    Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_account_nbr->pat_id = propMsg->fin 
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_name [1]->last_name = propMsg->patientLast
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_name [1]->first_name = propMsg->patientFirst
+
+	; Format patient date of birth (PID.7) to YYYYMMDD
+    EXECUTE oencpm_msglog(BUILD("DOB input: ", propMsg->DOB, char(0) ))
+    set patientDOB=dateFormat(propMsg->DOB);
+    EXECUTE oencpm_msglog(BUILD("DOB output: ", patientDOB, char(0) ))
+
+    Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->date_of_birth = patientDOB	
+    Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->sex = propMsg->gender
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->hospital_service = propMsg->hospitalService
+	Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->assigned_pat_loc->nurse_unit = propMsg->nursingStation
+	Set oen_reply->PERSON_GROUP [1]->FIN_GROUP [1]->INS_GROUP [1]->IN1->policy_nbr = propMsg->policyNumber
+
+endif
+
+EXECUTE oencpm_msglog("vvk_map_to_lib2 FINISHED. ") 
+  
+ 
+/*************************************************************************************************
+  DEFINED SUBROUTINES 
+**************************************************************************************************/
+subroutine dateFormat(dateValueStr)
+; needs input string in format "mm-dd-yyyy"
+; formats to output "yyyymmdd"
+
+   declare dateString=vc
+ 
+   if(dateValueStr!="")
+      set dateString = build(
+      	substring(7,4,dateValueStr),	; YYYY
+      	substring(1,2,dateValueStr),	; MM
+      	substring(4,2,dateValueStr))	; DD
+    endif
+   return (dateString)
+end
+
+
+
+
+
+
+

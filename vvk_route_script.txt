@@ -11,11 +11,11 @@
  */
  
 ; Our DISK OUT CommServers
-declare VVK_DISK_OUT  =i4 with nonconstant(1029)
-declare VVK_DISK_OUT2 =i4 with nonconstant (9999)
+declare VVK_DISK_OUT  =i4 with CONSTANT(1029)
+declare VVK_DISK_OUT2 =i4 with CONSTANT (1075)
 
 ; Optimistic view on life; we have success.
-declare ReturnCode =i4 with nonconstant (1)
+declare ReturnCode =i4 with NOCONSTANT (1)
 
 case (Oenobj->CONTROL_GROUP [1]->MSH [1]->message_type->messg_type) 
 
@@ -30,7 +30,7 @@ of "ORM":
 of "ORU":
    set stat = alterlist(OenRoute->route_list, 2)
    set OenRoute->route_list[1]->r_pid=VVK_DISK_OUT 
-   set OenRoute->route_list[1]->r_pid=VVK_DISK_OUT2    
+   set OenRoute->route_list[2]->r_pid=VVK_DISK_OUT2    
 else 
    set ReturnCode = 0
 

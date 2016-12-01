@@ -1,0 +1,93 @@
+/*
+ *  ---------------------------------------------------------------------------------------------
+ *  Script Name:  vvk_map_from_lib
+ *  Description:  Vincents Map From Library
+ *  Type:  Open Engine Map from Library Script
+ *  ---------------------------------------------------------------------------------------------
+ *  Author:  CRSADMIN11
+ *  Domain:  UKTRMC05
+ *  Creation Date:  01/12/2016 13:40:40
+ *  ---------------------------------------------------------------------------------------------
+ *  Purpose - (Activity 12)
+ *  1. Write to a proprietary file format, using a delimited input file
+ *  ---------------------------------------------------------------------------------------------
+ */ 
+
+ ; example:   ADTA01012345678900640458BOZO,DAN                                06-06-1966MSVSOUTH     6866-3457
+
+declare dateFormat(dateValueStr=vc)=vc
+
+record propMsg
+(
+   1 messageType =c3          ; MSH 9.1 Type
+   1 messageTrigger =c3       ; MSH 9.2 Event
+   1 mrn =c10                 ; PID 3.1 Patient ID
+   1 fin =c8                  ; PID 18.1 Patient Account 
+   1 patientName =c40		  ; Lastname,Firstname
+							  ; PID 5.1 LastName 
+                              ; PID 5.2 FirstName
+   1 DOB =c10                 ; PID 7 Date of Birth
+   1 gender =c1               ; PID 8 Sex
+   1 hospitalService =c2      ; PV1 10 Hospital Service
+   1 nursingStation =c10      ; PV1 3.1 Point of Service Location
+   1 policyNumber =c9         ; IN1 36 Policy Number
+)
+
+EXECUTE oencpm_msglog("vvk_map_from_lib STARTED. ") 
+
+;------------------------------------------------------------------------------
+; Map HL7 fields on the Record Structure
+Set propMsg->messageType     = oen_request->CONTROL_GROUP [1]->MSH [1]->message_type->messg_type 
+Set propMsg->messageTrigger  = oen_request->CONTROL_GROUP [1]->MSH [1]->message_type->messg_trigger
+Set propMsg->mrn             = oen_request->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_id_int [1]->pat_id
+Set propMsg->fin             = oen_request->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_account_nbr->pat_id
+
+; Combine Lastname, Firstname
+Set patientLast  = oen_request->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_name [1]->last_name
+Set patientFirst = oen_request->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->patient_name [1]->first_name
+Set propMsg->patientName = BUILD(patientLast, ",", patientFirst)
+
+; Format patient date of birth (PID.7) to mm-dd-yyyy
+set DOB = oen_request->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->date_of_birth
+EXECUTE oencpm_msglog(BUILD("DOB input: ", DOB, char(0) ))
+set propMsg->DOB = dateFormat(DOB);
+EXECUTE oencpm_msglog(BUILD("DOB output: ", propMsg->DOB, char(0) ))
+
+Set propMsg->gender          = oen_request->PERSON_GROUP [1]->PAT_GROUP [1]->PID [1]->sex
+Set propMsg->hospitalService = oen_request->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->hospital_service
+Set propMsg->nursingStation  = oen_request->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->assigned_pat_loc->nurse_unit
+Set propMsg->policyNumber    = oen_request->PERSON_GROUP [1]->FIN_GROUP [1]->INS_GROUP [1]->IN1->policy_nbr
+;------------------------------------------------------------------------------	
+
+EXECUTE oencpm_msglog(BUILD("Output=", propMsg, char(0))) 
+
+; Write record structure to fixed file format.
+Set oen_reply->out_msg = BUILD2(propMsg, char(0))
+
+EXECUTE oencpm_msglog("vvk_map_from_lib FINISHED. ") 
+
+
+/*************************************************************************************************
+  DEFINED SUBROUTINES 
+**************************************************************************************************/
+subroutine dateFormat(dateValueStr)
+; needs input string in format "yyyymmdd"
+; formats to output "mm-dd-yyyy"
+
+   declare dateString=vc
+ 
+   if(dateValueStr!="")
+      set dateString = build(
+      	substring(5,2,dateValueStr), "-",  ; MM-
+      	substring(7,2,dateValueStr), "-",  ; DD-
+      	substring(1,4,dateValueStr))	   ; YYYY		
+    endif
+   return (dateString)
+end
+	
+	
+
+
+
+
+

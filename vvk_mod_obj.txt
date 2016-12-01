@@ -114,8 +114,18 @@ EXECUTE oencpm_msglog(BUILD("vvk_mod_obj STARTED. ", char(0)))
 
 	; We found a Refferring Community Physician (on index>1). Move this referring doctor to index 1 ; and change array size to 1
 	if (foundIndex>1)
-	  set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [1] = 
-		 oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [foundIndex]
+	  EXECUTE oencpm_msglog(BUILD("Move Referring doctor from idex=",foundIndex, char(0)))
+
+	  Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [1]->id_nbr = 
+	     oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [foundIndex]->id_nbr 
+      Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [1]->last_name =
+         oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [foundIndex]->last_name	  
+      Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [1]->first_name =
+	     oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [foundIndex]->first_name 
+      Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [1]->id_type =
+	     oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc [foundIndex]->id_type 
+		 
+	  EXECUTE oencpm_msglog(BUILD("Adjust Referring doctor array to 1 element", char(0)))
 	  set stat = alterlist(oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->referring_doc, 1)
 	endif
 
@@ -135,8 +145,18 @@ EXECUTE oencpm_msglog(BUILD("vvk_mod_obj STARTED. ", char(0)))
 
 	; We found a Consulting Community Physician (on index>1). Move this referring doctor to index 1 ; and change array size to 1
 	if (foundIndex>1)
-	  set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [1] = 
-		 oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [foundIndex]
+      EXECUTE oencpm_msglog(BUILD("Move Consulting doctor from idex=",foundIndex, char(0)))
+
+	  Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [1]->id_nbr = 
+	     oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [foundIndex]->id_nbr 
+      Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [1]->last_name =
+         oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [foundIndex]->last_name	  
+      Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [1]->first_name =
+	     oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [foundIndex]->first_name 
+      Set oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [1]->id_type =
+	     oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc [foundIndex]->id_type 
+		 
+	   EXECUTE oencpm_msglog(BUILD("Adjust Referring doctor array to 1 element", char(0)))		 
 	  set stat = alterlist(oen_reply->PERSON_GROUP [1]->PAT_GROUP [1]->PV1 [1]->consulting_doc, 1)
 	endif
 	
